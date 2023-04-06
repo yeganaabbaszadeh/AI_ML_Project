@@ -1,3 +1,4 @@
 template
 /datasets/yoga_dataset
 /runs
+*__pycache__
