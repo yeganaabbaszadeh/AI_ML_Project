@@ -2,24 +2,32 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import softmax
 from torch.nn.functional import cross_entropy
+from torchmetrics import F1Score
 
 
 from torch.utils.data import DataLoader, Dataset
-from models.example_model import ExModel
+from models.model import  ResNet18, VGG16
 from datasets.dataset_retrieval import custom_dataset
 from torch.optim import SGD, Adam
 from torch.utils.tensorboard import SummaryWriter
 import tqdm
-from utils import metrics
+
 import os
 
 save_model_path = "checkpoints/"
-pth_name = "saved_model.pth"
+pth_name = "resnet18sgd.pth"
+# pth_name = "resnet18adam.pth"
+# pth_name = "vgg16sgd.pth"
+# pth_name = "vgg16adam.pth"
 
 
 def val(model, data_val, loss_function, writer, epoch):
-    f1_score = 0
+    f1score = 0
+    f1 = F1Score(num_classes=107, task = 'multiclass')
     data_iterator = enumerate(data_val)  # take batches
+    f1_list = []
+    f1t_list = []
+
     with torch.no_grad():
         model.eval()  # switch model to evaluation mode
         tq = tqdm.tqdm(total=len(data_val))
@@ -38,66 +46,69 @@ def val(model, data_val, loss_function, writer, epoch):
             loss = loss.cuda()
 
             pred = pred.softmax(dim=1)
-            f1_score += metrics(pred.detach().cpu(), label.detach().cpu())
+            
+            f1_list.extend(torch.argmax(pred, dim =1).tolist())
+            f1t_list.extend(torch.argmax(label, dim =1).tolist())
+            #f1score += f1_score(label.squeeze().detach().cpu(), pred.squeeze().detach().cpu())
 
             total_loss += loss.item()
             tq.update(1)
 
-    writer.add_scalar("Validation mIoU", f1_score/len(data_val), epoch)
+
+    writer.add_scalar("F1 score", f1score, epoch)
+    writer.add_scalar("Validation mIoU", f1score/len(data_val), epoch)
     writer.add_scalar("Validation Loss", total_loss/len(data_val), epoch)
 
-    print("F1 score: ", f1_score/len(data_val))
-
     tq.close()
+    print("F1 score: ", f1(torch.tensor(f1_list), torch.tensor(f1t_list)))
+
 
     return None
 
 
-def train(model, train_data, val_data,  optimizer, loss, max_epoch):
-
+def train(model, dataloader, val_loader, optimizer, loss_fn, n_epochs):
+    device = 'cuda'
     writer = SummaryWriter()
-    for epoch in range(max_epoch):
 
-        # if you are going to update your model, put it in train mode.
-        model.train()
-
-        f1_score = 0  # to find total performance per epoch
-        loss_total = 0
-
-        data_iterator = enumerate(train_data)
-
-        # tqdm is library to see he progressbar
-        tq = tqdm.tqdm(total=len(train_data))
+    model.cuda()  # Move the model to the specified device (e.g., GPU or CPU)
+    model.train()  # Set the model to training mode
+    for epoch in range(n_epochs):
+        running_loss = 0.0
+        tq = tqdm.tqdm(total=len(dataloader))
         tq.set_description('epoch %d' % (epoch))
+        f1score = 0
 
-        for it, batch in data_iterator:
-            optimizer.zero_grad()
+        for i, (images, labels) in enumerate(dataloader):
+            images = images.to(device)  # Move the batch of images to the specified device
+            labels = labels.to(device)  # Move the batch of labels to the specified device
+            
+            optimizer.zero_grad()  # Reset the gradients of the optimizer
+            
+            # Forward pass
+            outputs = model(images)
+            
+            # Compute loss
+            loss = loss_fn(outputs, labels)
+            outputs = outputs.softmax(dim=1)
 
-            images, labels = batch
+            # Backward pass
+            loss.backward()
+            #f1score += f1_score(labels.detach().cpu(), outputs.detach().cpu())
 
-            pred = model(images.cuda())
-            pred = softmax(pred, dim=1)
-
-            loss_value = loss(pred, labels.cuda())
-
-            f1_score += metrics(pred.detach().cpu(), labels.detach().cpu())
-
-            loss_value.backward()
+            # Update model parameters
             optimizer.step()
-
-            # pay attention!! if you dont write .item() you will overload gpu
-            loss_total += loss_value.item()
-
-            tq.set_postfix(loss_st='%.6f' % loss_value)
+            
+            running_loss += loss.item()
+            tq.set_postfix(loss_st='%.6f' % loss.item())
             tq.update(1)
-
-        writer.add_scalar("Training F1", f1_score/len(train_data), epoch)
-        writer.add_scalar("Validation Loss", loss_total/len(val_data), epoch)
-
         tq.close()
-
-        val(model, val_data, loss, writer, epoch)
-
+        epoch_loss = running_loss / len(dataloader)
+        print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, n_epochs, epoch_loss))
+        
+        print(f1score/len(dataloader))
+        
+        val(model, val_loader, loss_fn, writer, epoch)
+        
         checkpoint = {
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
@@ -106,6 +117,7 @@ def train(model, train_data, val_data,  optimizer, loss, max_epoch):
 
         torch.save(checkpoint, os.path.join(save_model_path, pth_name))
         print("saved the model " + save_model_path)
+        model.train()
 
 
 train_data = custom_dataset("train")
@@ -119,18 +131,24 @@ train_loader = DataLoader(
 
 val_loader = DataLoader(
     val_data,
-    batch_size=1
+    batch_size=8
 )
 
-model = ExModel(107).cuda()
-#optimizer = SGD(model.parameters(),  lr=0.001)
-optimizer = Adam(model.parameters(), lr=0.001)
-loss = nn.CrossEntropyLoss()
+# CNN architectures ResNet18 and VGG16 are defined in models/model.py
+model = ResNet18(107).cuda()   # Initializing an object of the class.
+# model = VGG16(107).cuda()   # Initializing an object of the class.
+# print(model(train_data[0][0].unsqueeze(0).cuda()))
 
+# Optimizers are defined in torch.optim
+optimizer = SGD(model.parameters(),  lr=0.005)
+# optimizer = Adam(model.parameters(), lr=0.0005)
+
+# Loss functions are defined in torch.nn.functional
+loss = nn.CrossEntropyLoss()
 
 # if you want to load your pretrained model or
 # you want to resume stopped training
 # use torch.load_state_dict by checking the library!
 
 
-train(model, train_loader, val_loader, optimizer, loss, 15)
+train(model, train_loader, val_loader,  optimizer,loss, 50)

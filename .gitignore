@@ -1,4 +1,7 @@
 template
 /datasets/yoga_dataset
+/datasets/PetImages
 /runs
-*__pycache__
+__pycache__/
+*.pyc
+/checkpoints

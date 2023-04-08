@@ -1,38 +1,61 @@
 import torch
-import torchvision.transforms as transforms
+from torchmetrics import F1Score
+from models.model import ResNet18, VGG16
+
 from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
-from multiprocessing import freeze_support
+from datasets.dataset_retrieval import custom_dataset
+import tqdm
 
-def calculate_mean_std(dataset):
-    dataloader = DataLoader(dataset, batch_size=1, num_workers=4, shuffle=False)
 
-    mean = torch.zeros(3)
-    std = torch.zeros(3)
+def test(model, data_test):
+    f1score = 0
+    f1 = F1Score(num_classes=107, task='multiclass')
+    data_iterator = enumerate(data_test)  # take batches
+    f1_list = []
+    f1t_list = []
 
-    print('==> Computing mean and std..')
-    for images, _ in dataloader:
-        for i in range(3):
-            mean[i] += images[:,i,:,:].mean()
-            std[i] += images[:,i,:,:].std()
+    with torch.no_grad():
+        model.eval()  # switch model to evaluation mode
+        tq = tqdm.tqdm(total=len(data_test))
+        tq.set_description('test:')
 
-    mean.div_(len(dataset))
-    std.div_(len(dataset))
+        total_loss = 0
 
-    print(f'Mean: {mean}')
-    print(f'STD: {std}')
-    # Mean: tensor([0.6187, 0.5749, 0.5616])
-    # STD: tensor([0.2749, 0.2739, 0.2665])
+        for _, batch in data_iterator:
+            # forward propagation
+            image, label = batch
+            image = image.cuda()
+            label = label.cuda()
+            pred = model(image)
 
-if __name__ == '__main__':
-    freeze_support()
+            pred = pred.softmax(dim=1)
 
-    data_path = 'datasets/yoga_dataset'
-    transform = transforms.Compose([transforms.Resize(256),
-                                    transforms.CenterCrop(224),
-                                    transforms.ToTensor()])
+            f1_list.extend(torch.argmax(pred, dim=1).tolist())
+            f1t_list.extend(torch.argmax(label, dim=1).tolist())
+            #f1score += f1_score(label.squeeze().detach().cpu(), pred.squeeze().detach().cpu())
 
-    dataset = ImageFolder(data_path, transform=transform)
+            #total_loss += loss.item()
+            tq.update(1)
 
-    calculate_mean_std(dataset)
+    tq.close()
+    print("F1 score: ", f1(torch.tensor(f1_list), torch.tensor(f1t_list)))
 
+    return None
+
+
+test_data = custom_dataset("test")
+
+
+test_loader = DataLoader(
+    test_data,
+    batch_size=8
+)
+
+model = ResNet18(107).cuda()
+# model = VGG16(107).cuda()
+
+checkpoint = torch.load("checkpoints/vgg16sgd.pth")
+
+model.load_state_dict(checkpoint['state_dict'])
+
+test(model, test_loader)

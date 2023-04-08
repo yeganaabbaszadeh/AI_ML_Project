@@ -13,7 +13,6 @@ import random
 # print(len(dataset.classes))
 
 class custom_dataset(Dataset):
-
     # initialize your dataset class
     def __init__(self, mode="train", image_path="datasets/yoga_dataset", label_path="relative/path/to/your/labels", resize_size=(256, 256)):
         self.mode = mode    # you have to specify which set do you use, train, val or test
@@ -92,36 +91,33 @@ class custom_dataset(Dataset):
         # print(np.array(image).shape)
         # transform = transforms.Compose([transforms.ToTensor()])
         transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees=(-30, 30)),
+            #transforms.RandomHorizontalFlip(p=0.5),
+            #transforms.RandomRotation(degrees=(-30, 30)),
             transforms.Resize(self.resize_size),  # resize the image
             transforms.RandomCrop((224, 224)),
             transforms.ToTensor(),  # convert to tensor
-            # transforms.ToTensor(),  # convert to tensor
-            # transforms.Normalize(mean=[0.6187, 0.5749, 0.5616], std=[0.2749, 0.2739, 0.2665])  # normalize the pixel values
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # normalize the pixel values
+            transforms.Normalize(mean=[0.6187, 0.5749, 0.5616], std=[0.2749, 0.2739, 0.2665])  # normalize the pixel values
+            # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # normalize the pixel values
         ])
 
-# Mean: tensor([0.6187, 0.5749, 0.5616])
-# STD: tensor([0.2749, 0.2739, 0.2665])
+        # Mean: tensor([0.6187, 0.5749, 0.5616])
+        # STD: tensor([0.2749, 0.2739, 0.2665])
         try:
-            image = transform(image)
-        except Exception as e:
             image = image.convert('RGB')
+            image = transform(image) 
+        except Exception as e:    
             image = transform(image)
 
         label = self.parse_labels(label)
-
         # label = torch.as_tensor(label)
 
         # all labels should be converted from any data type to tensor
         # for parallel processing
-
         return image, label
+
 
     def parse_labels(self, label):
         # parse the labels to one hot encoding
-
         one_hot = [0 for i in range(len(self.unique_labels))]
         one_hot[self.unique_labels.index(label)] = 1
 
@@ -129,6 +125,7 @@ class custom_dataset(Dataset):
         one_hot_tensor = torch.tensor(one_hot, dtype=float, requires_grad=True)
 
         return one_hot_tensor
+
 
     def __len__(self):
         return len(self.images)
