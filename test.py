@@ -51,10 +51,10 @@ test_loader = DataLoader(
     batch_size=8
 )
 
-model = ResNet18(107).cuda()
-# model = VGG16(107).cuda()
+# model = ResNet18(107).cuda()
+model = VGG16(107).cuda()
 
-checkpoint = torch.load("checkpoints/vgg16sgd.pth")
+checkpoint = torch.load("checkpoints/vgg16adam.pth")
 
 model.load_state_dict(checkpoint['state_dict'])
 
