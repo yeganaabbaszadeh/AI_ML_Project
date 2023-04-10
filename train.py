@@ -15,10 +15,11 @@ import tqdm
 import os
 
 save_model_path = "checkpoints/"
+pth_name = "saved_model.pth"
 # pth_name = "resnet18sgd.pth"
 # pth_name = "resnet18adam.pth"
 # pth_name = "vgg16sgd.pth"
-pth_name = "vgg16adam.pth"
+# pth_name = "vgg16adam.pth"
 
 
 def val(model, data_val, loss_function, writer, epoch):
@@ -134,14 +135,14 @@ val_loader = DataLoader(
 )
 
 # CNN architectures ResNet18 and VGG16 are defined in models/model.py
-# model = ResNet18(107).cuda()   # Initializing an object of the class.
-model = VGG16(107).cuda()   # Initializing an object of the class.
+model = ResNet18(107).cuda()   # Initializing an object of the class.
+# model = VGG16(107).cuda()   # Initializing an object of the class.
 # print(model(train_data[0][0].unsqueeze(0).cuda()))
 
 # Optimizers are defined in torch.optim
-# optimizer = SGD(model.parameters(),  lr=0.005)
+optimizer = SGD(model.parameters(),  lr=0.005)
 # optimizer = Adam(model.parameters(), lr=0.0005)
-optimizer = Adam(model.parameters(), lr=0.0001)
+# optimizer = Adam(model.parameters(), lr=0.0001)
 
 
 # Loss functions are defined in torch.nn.functional

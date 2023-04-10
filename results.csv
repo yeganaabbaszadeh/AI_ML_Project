@@ -1,5 +1,5 @@
-Model,Optimizer,Loss,Accuracy F1, Validation loss,Test accuracy
-ResNet18,SGD,CE,tensor(0.7195),Loss: 0.0648,tensor(0.7108)
-ResNet18,Adam,CE,tensor(0.6611),Loss: 0.1877,tensor(0.6417)
-VGG16,SGD,CE,tensor(0.6978),Loss: 0.0526,tensor(0.7008)
-VGG16,Adam,CE,tensor(0.6477),Loss: 0.1349,tensor(0.6308)
+Model,Optimizer,Loss,Accuracy F1,Validation loss,Test accuracy
+ResNet18,SGD,CE,0.7195,0.0648,0.7108
+ResNet18,Adam,CE,0.6611,0.1877,0.6417
+VGG16,SGD	CE,0.6978,0.0526,0.7008
+VGG16,Adam,CE,0.6477,0.1349,0.6308
